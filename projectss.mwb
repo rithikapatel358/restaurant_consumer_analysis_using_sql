@@ -1,0 +1,134 @@
+create database project;
+select * from  restaurant_cuisines;
+select *from consumers;
+select *from data_dictionary;
+select * from ratings;
+select *from .;
+select *from restaurants;
+-- 1
+select *from consumers where City='Cuernavaca';
+-- 2
+alter table consumers change  ï»¿Consumer_ID Consumer_ID text;
+select Consumer_ID,Age,Occupation from consumers where Occupation='Student' AND smoker='Yes';
+desc consumers;
+-- 3
+select city,alcohol_service,price from restaurants where Alcohol_Service='Wine & Beer' and price='medium';
+-- 4
+select name,city from restaurants where franchise='Yes';
+-- 5
+alter table ratings change  ï»¿Consumer_ID Consumer_ID text;
+alter table ratings add Satisfactory_rate text;
+select consumer_id,restaurant_id,overall_rating from ratings where Overall_Rating=2;
+update ratings set satisfaction_rate=case when overall_rating=2 THEN 'Highly satisfactory'
+when overall_rating=1 then 'Average' else 'disappointed'
+END;
+select consumer_id,restaurant_id,Overall_Rating,satisfactory_rate from ratings where satisfactory_rate='highly satisfactory';
+-- Joins
+alter table restaurants change  ï»¿Restaurant_ID Restaurant_ID text;
+select r.name,r.city from restaurants r join ratings ra on r.restaurant_id=ra.restaurant_id where ra.overall_rating=2;
+-- 2
+select c.age,c.consumer_id from consumers c join ratings ra on c.consumer_id=ra.consumer_id join restaurants r on ra.restaurant_id = r.restaurant_id
+where r.city='San Luis Potosi';
+-- 3
+alter table restaurant_cuisines change  ï»¿Restaurant_ID Restaurant_ID int;
+select r.name from restaurants r join restaurant_cuisines rc on r.restaurant_id=rc.restaurant_id
+join ratings ra on r.Restaurant_ID=ra.Restaurant_ID 
+where rc.cuisine='Mexican' and ra.consumer_id='U1001';
+-- 4
+alter table consumer_preferences change  ï»¿Consumer_ID Consumer_ID text;
+select cp.Preferred_Cuisine,budget from consumer_preferences cp join  consumers c on cp.consumer_id=c.consumer_id
+ where cp.Preferred_Cuisine ='American' and c.budget='Medium';
+ -- 5
+ select r.name,r.city from restaurants r join ratings ra on
+r.Restaurant_ID=ra.Restaurant_ID where ra.food_rating<(select AVG(food_rating) from ratings);
+ -- 6
+ select distinct c.consumer_id,c.age,c.occupation from
+ consumers c join ratings ra on c.consumer_ID=ra.consumer_id 
+ where c.consumer_id not in
+ ( select r2.consumer_id from ratings r2 join restaurant_cuisines rc on
+ r2.Restaurant_ID=rc.restaurant_id where rc.cuisine='Italian');
+ -- 7
+ select r.name from restaurants r join ratings ra on r.Restaurant_ID=ra.Restaurant_ID 
+ join consumers c  on c.Consumer_ID=ra.Consumer_ID where c.age>30;
+ -- 8
+ select c.consumer_id,c.occupation from consumers c join consumer_preferences cp 
+on c.consumer_id=cp.Consumer_ID join ratings ra on ra.consumer_id=cp.consumer_id 
+where cp.Preferred_Cuisine='Mexican' and ra.overall_rating=0;
+-- 9
+select r.name,r.city from restaurants r join restaurant_cuisines rc 
+on r.Restaurant_ID=rc.Restaurant_ID
+ where rc.cuisine='pizzeria' and r.city in
+ (select city from  consumers where occupation='student');
+ -- 10
+ select  c.consumer_id,c.age from consumers c join ratings ra on c.consumer_id=ra.consumer_id
+ join restaurants r on ra.restaurant_id=r.Restaurant_ID where c.Drink_Level=
+ 'social drinker' and r.parking='yes';
+ -- 1
+ select c.consumer_id,count(ra.restaurant_id) as total_rated from consumers c
+ join ratings ra on c.consumer_id=ra.consumer_id where c.occupation='student'  group by c.consumer_id having count(ra.Restaurant_ID)>2; 
+ -- 2
+ select c.consumer_id,c.age,c.age/10 as engagement_score from consumers c where c.age/10=2 and c.transportation_method='public';
+ -- 3
+ select r.name,r.city,avg(ra.overall_rating) as avg_rating from restaurants 
+ r join ratings ra on r.restaurant_id=ra.restaurant_id where r.city='Cuernavaca'
+ group by r.Restaurant_ID,r.name,r.city having avg(ra.overall_rating)>1.0;
+ -- 4
+ select c.consumer_id,c.age from consumers c join ratings ra on c.consumer_id=ra.consumer_id 
+ where c.Marital_Status='Married' and ra.Food_Rating=ra.Service_Rating and ra.Overall_Rating=2;
+ -- 5
+ select c.consumer_id,c.age,r.name as restaurant_name from consumers c join ratings ra 
+ on c.consumer_id=ra.consumer_id join restaurants r on r.Restaurant_ID=ra.Restaurant_ID
+ where c.Occupation='Employed' and ra.food_rating=0 and r.city='Ciudad Victoria';
+-- 1 
+with ratings1 As (Select distinct c.consumer_id,c.age,r.name as restaurent_name from consumers c 
+join ratings ra on ra.consumer_id=c.consumer_id 
+join restaurants r on r.Restaurant_ID=ra.Restaurant_ID
+join restaurant_cuisines rc on rc.restaurant_id=ra.Restaurant_ID
+where c.city='San Luis Potosi' and rc.cuisine='Mexican' and ra.overall_rating=2)
+select *from ratings1;
+
+-- 2
+select t.occupation,avg(t.age) as average_age
+from (select distinct c.consumer_id,c.occupation,c.age from consumers c
+ join ratings ra on ra.consumer_id=c.consumer_id ) as t group by t.occupation;
+ 
+-- 3
+with cte2 as (select r.Restaurant_ID as rid,c.Consumer_ID as cid,ra.Overall_Rating as ot from ratings ra 
+join consumers c on ra.consumer_id=c.consumer_id
+join restaurants r on r.Restaurant_ID=ra.Restaurant_ID where r.city='Cuernavaca')
+select rid,cid,ot,rank() over (partition by rid order by ot desc) as ranking
+from cte2 order by rid,ranking;
+
+-- 4
+select ra.consumer_id,ra.restaurant_id,ra.overall_rating,t.avg_rating from ratings ra
+join (select Consumer_ID,avg(Overall_Rating) as avg_rating
+ from ratings group by Consumer_ID) as t 
+on ra.consumer_id=t.consumer_id order by ra.consumer_id,ra.restaurant_id;
+-- using cte
+with cte3 as (select Consumer_ID,avg(Overall_Rating) as avg_rating
+ from ratings group by Consumer_ID)
+ select ra.consumer_id,ra.restaurant_id,ra.overall_rating,cte3.avg_rating from cte3
+ join ratings ra on cte3.consumer_id=ra.consumer_id 
+ ORDER BY ra.consumer_id, ra.restaurant_id;
+ -- 5
+ with cte4 as(select Consumer_ID,occupation,Budget from consumers
+ where budget='low' and occupation='student' )
+ select cp.consumer_id,cp.Preferred_Cuisine,row_number() over (partition by cp.Consumer_ID 
+ order by cp.Preferred_Cuisine )from consumer_preferences cp 
+ join cte4 on cte4.consumer_id=cp.consumer_id where rownumber<=3;
+ 
+ SELECT consumer_id,preferred_cuisine,ROW_NUMBER() OVER (PARTITION BY consumer_id ORDER BY preferred_cuisine)
+             from consumer_preferences ;
+  
+-- 12
+DELIMITER $$
+create procedure GetConsumerSegmentAndRestaurantPerformance(IN p_consumer_id INT)
+begin
+select  budget,case budget when 'low' then 'Budget conscious'
+when 'medium' then 'moderate spender'
+when 'high' then 'premium spender'
+else 'unknown budget'
+end ;
+END $$
+DELIMETER ; 
+select 
